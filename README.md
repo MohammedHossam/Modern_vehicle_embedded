@@ -1,0 +1,2 @@
+# Modern_vehicle_embedded
+Modern day vehicles come with various safety and entertainment features to make our lives better. However, safety features are considered more important than entertainment features, consequently they have higher priorities when it comes to execution. In this project, we are going to implement some of these features using an Arduino (Mega) board, giving each feature a suitable priority. Arduino C alongside FreeRTOS will be used to implement the project.
