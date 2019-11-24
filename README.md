@@ -7,13 +7,13 @@
    a) Alerts a driver to an imminent crash with audible warnings.
    b) It will independently brake and stop the car.
 
-# 2)Warning Indicators and Power Mirrors
+# 2) Warning Indicators and Power Mirrors
    The dashboard displays the following information in REAL-TIME on an LCD Display:
    a) Rain Detection.
    b) Low Level Fuel Detection.
    c) Seat-Belt Detection with Audible Warning.
    d) Adjustable Mirrors in two directions.
    
-# 3)Keyless Entry
+# 3) Keyless Entry
    a) Lock and Unlock your car without a physical key.
    b) Start/Stop Engine button.
