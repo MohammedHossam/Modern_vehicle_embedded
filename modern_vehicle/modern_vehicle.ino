@@ -14,13 +14,13 @@ bool seatBelt = false;
 //----------------- servo
 int  x = A0;
 int y = A1;
-int servo1Angle=90;
-int servo2Angle=90;
+int servoRAngle=90;
+int servoLAngle=90;
 int valx=0;
 int valy=0;
 
-Servo myservo1; 
-Servo myservo2; 
+Servo servoRight; 
+Servo servoLeft; 
 
 //----------------- LCD
 const int rs = 11, en = 10, d4 =9 ,d5 = 8, d6 = 7, d7 = 6;
@@ -28,8 +28,11 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 char* rain=malloc(sizeof(char)*3);
 
 //-----------------push button seatbelt
-#define seatPush 2
+int seatPush = 2;
+volatile int buttonState = 0;         // variable for reading the pushbutton status
+int ledPin =  35;
 int buzzer = 36;
+
 
 //----------------- rain sensor
 
@@ -73,26 +76,36 @@ unsigned long getID(){
   mfrc522.PICC_HaltA(); // Stop reading
   return hex_num;
 }
-//-------------------------------------------------------------------------------------------
 
 void handler_belt ()
 {
-
-    Serial.println(digitalRead(seatPush));
+  //buttonState = digitalRead(buttonPin);
+  buttonState = (buttonState +1)%2;
+  digitalWrite(ledPin, buttonState);
+  seatBelt=!seatBelt;
+  //delay(50);
 }
+
+//-------------------------------------------------------------------------------------------
+
 void setup() {
   Serial.begin(9600);
   //--------------SeatBelt
-  pinMode(seatPush, INPUT_PULLUP);
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, HIGH);
+  pinMode(seatPush, INPUT);
+
   pinMode(buzzer, OUTPUT);
   digitalWrite(buzzer,HIGH);
-  attachInterrupt(digitalPinToInterrupt(seatPush), handler_belt, FALLING);
+
+   attachInterrupt(digitalPinToInterrupt(seatPush), handler_belt, RISING);
+  //attachInterrupt(digitalPinToInterrupt(seatPush), handler_belt, FALLING);
 
   // ------------Mirrors setup
   pinMode(x, INPUT);
   pinMode(y, INPUT);
-  myservo1.attach(40);  
-  myservo2.attach(41); 
+  servoRight.attach(40);  
+  servoLeft.attach(41); 
 
   // ------------lcd setup
   lcd.begin(16, 2); 
@@ -128,10 +141,10 @@ void Buzzer (void *pvParameters) // buzz when belt.
   const TickType_t xDelay=pdMS_TO_TICKS(25);
   xLastWakeTime = xTaskGetTickCount();  
   while (1) {
-//  /  if(!seatBelt)
-   //   digitalWrite(buzzer,HIGH);
-//   / else
-//      /digitalWrite(buzzer,LOW);
+      if(!seatBelt)
+        digitalWrite(buzzer,HIGH);
+     else
+        digitalWrite(buzzer,LOW);
 
     delay(15);
     vTaskDelayUntil(&xLastWakeTime,xDelay);
@@ -148,31 +161,31 @@ void Mirrors (void *pvParameters) // Mirrors.
     valy = analogRead(y); 
     
     if(valx<341){
-      servo1Angle+=2;   //right
+      servoRAngle+=2;   //right
     }
     else if(valx>682){
-      servo1Angle-=2;
+      servoRAngle-=2;
     }
     if(valy<341){
-      servo2Angle+=2;
+      servoLAngle+=2;
     }
     else if(valy>682){
-      servo2Angle-=2;
+      servoLAngle-=2;
     }
-    if(servo1Angle<0){
-      servo1Angle=0;
+    if(servoRAngle<0){
+      servoRAngle=0;
     }
-    if(servo1Angle>90){
-      servo1Angle=90;
+    if(servoRAngle>90){
+      servoRAngle=90;
     }
-    if(servo2Angle<90){
-      servo2Angle=90;
+    if(servoLAngle<90){
+      servoLAngle=90;
     }
-    if(servo2Angle>180){
-      servo2Angle=180;
+    if(servoLAngle>180){
+      servoLAngle=180;
     }
-    myservo1.write(servo1Angle);
-    myservo2.write(servo2Angle);
+    servoRight.write(servoRAngle);
+    servoLeft.write(servoLAngle);
     delay(15);
     vTaskDelayUntil(&xLastWakeTime,xDelay);
   }
@@ -192,11 +205,11 @@ void LCD( void *pvParameters) //LCD.
     lcd.setCursor(0, 1);
     lcd.print("R");
     lcd.setCursor(1, 1);
-    lcd.print(servo1Angle);
+    lcd.print(servoRAngle);
     lcd.setCursor(5, 1);
     lcd.print("L");
     lcd.setCursor(6,1);
-    lcd.print(servo2Angle);
+    lcd.print(servoLAngle);
     lcd.setCursor(14, 1);
     // print the number of seconds since reset:
     lcd.print(millis() / 1000);

@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/home/ahmed/Desktop/arduino-1.8.10-linux64/arduino-1.8.10/tools/**",
+                "/home/ahmed/Desktop/arduino-1.8.10-linux64/arduino-1.8.10/hardware/arduino/avr/**",
+                "/media/ahmed/Local D/GUC/7th semester/CSEN 701 Embedded Systems/Project/emb/libraries/Arduino_FreeRTOS_Library-master_30909.zip"
+            ],
+            "forcedInclude": [
+                "/home/ahmed/Desktop/arduino-1.8.10-linux64/arduino-1.8.10/hardware/arduino/avr/cores/arduino/Arduino.h"
+            ],
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
