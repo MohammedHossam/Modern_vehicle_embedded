@@ -8,6 +8,8 @@
 //-------------------------------------------semaphors--------------------------------
 SemaphoreHandle_t sem_buzzer;
 SemaphoreHandle_t sem_engine;
+SemaphoreHandle_t sem_engine2;
+SemaphoreHandle_t sem_lock;
 //----------------------------------------- variables ----------------------------------------
 bool locked = false;
 bool engine = false;
@@ -81,7 +83,7 @@ void RFID( void *pvParameters);
 ///void Ultrasonic( void *pvParameters);
 //void Buzzer( void *pvParameters);
 void handler_belt( void *pvParameters);
-void Fuel( void *pvParameters);
+void setup2( );
 
 
 //------------------------------------------ Functions -----------------------------------------
@@ -103,9 +105,19 @@ unsigned long getID() {
 
 void setup() {
   Serial.begin(9600);
+  // ---------------- RFID
+  //while (!Serial);    // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
+  SPI.begin();      // Init SPI bus
+  mfrc522.PCD_Init();   // Init MFRC522
+  delay(4);       // Optional delay. Some board do need more time after init to be ready, see Readme
+  mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
+  Serial.println(F("Scan PICC to see UID, SAK, type, and data blocks..."));
+
   //---------------semphrs
   sem_buzzer = xSemaphoreCreateCounting( 2, 0 );
   sem_engine = xSemaphoreCreateCounting( 1, 0 );
+  sem_lock = xSemaphoreCreateCounting(1, 0);
+
   //--------------SeatBelt
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, HIGH);
@@ -114,8 +126,7 @@ void setup() {
   pinMode(buzzer, OUTPUT);
   digitalWrite(buzzer, LOW);
 
-  //attachInterrupt(digitalPinToInterrupt(seatPush), handler_belt, RISING);
-  //attachInterrupt(digitalPinToInterrupt(seatPush), handler_belt, FALLING);
+
 
   //-------------------- Engine
   pinMode(ledEngine, OUTPUT);
@@ -132,7 +143,7 @@ void setup() {
   digitalWrite(inB1, LOW);
   digitalWrite(inB2, HIGH);
 
-  // ------------Mirrors setup
+  //   ------------Mirrors setup
   pinMode(x, INPUT);
   pinMode(y, INPUT);
   servoRight.attach(40);
@@ -140,36 +151,33 @@ void setup() {
 
   // ------------lcd setup
   lcd.begin(16, 2);
-  //lcd.print("hello, world!");
+
 
   // ------------rain sensor setup
   pinMode(rainPin, INPUT);
 
-  // ---------------- RFID
-  while (!Serial);    // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
-  SPI.begin();
-  mfrc522.PCD_Init();    // Init MFRC522
-  delay(4);
-  mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
+  // ------------rfid lock
   pinMode(ledLock, OUTPUT);
-  digitalWrite(ledLock, HIGH);
-  Serial.println(F("Scan PICC to see UID, SAK, type, and data blocks..."));
-
+  digitalWrite(ledLock, LOW);
 
   //  //-------------- Ultrasonic
   //  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
   //  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
 
-  // -----------------------------
-  xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
-  xTaskCreate (LCD, "LCD", 1500, NULL, 1, NULL);
-  xTaskCreate (RainSensor, "RainSensor", 1000, NULL, 1, NULL);
-  //xTaskCreate (RFID, "RFID", 1000, NULL, 1, NULL);
-//  xTaskCreate (Ultrasonic, "Ultrasonic", 1000, NULL, 1, NULL);
 
+  // -----------------------------
   xTaskCreate (Buzzer, "Buzzer", 500, NULL, 1, NULL);
   xTaskCreate (handler_belt, "belt_handler", 500, NULL, 1, NULL);
   xTaskCreate (Engine, "Engine", 1000, NULL, 1, NULL);
+
+  xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
+
+  xTaskCreate (LCD, "LCD", 1500, NULL, 1, NULL);
+  xTaskCreate (RainSensor, "RainSensor", 1000, NULL, 1, NULL);
+  xTaskCreate (RFID, "RFID", 1000, NULL, 2, NULL);
+
+  //  xTaskCreate (Ultrasonic, "Ultrasonic", 1000, NULL, 1, NULL);
+
   //---------------------------------
 
 
@@ -214,8 +222,8 @@ void Buzzer (void *pvParameters) // buzz when belt.
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     digitalWrite(buzzer, LOW);
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
+      xSemaphoreTake(sem_lock, portMAX_DELAY);
+    xSemaphoreGive(sem_lock);
     xSemaphoreTake(sem_buzzer, portMAX_DELAY);
     digitalWrite(buzzer, HIGH);
     delay(100);
@@ -230,8 +238,8 @@ void Mirrors (void *pvParameters) // Mirrors.
   const TickType_t xDelay = pdMS_TO_TICKS(25);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
+      xSemaphoreTake(sem_lock, portMAX_DELAY);
+    xSemaphoreGive(sem_lock);
     valx = analogRead(x);
     valy = analogRead(y);
 
@@ -273,8 +281,8 @@ void LCD( void *pvParameters) //LCD.
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     lcd.clear();
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
+     xSemaphoreTake(sem_lock, portMAX_DELAY);
+    xSemaphoreGive(sem_lock);
     // set the cursor to column 0, row 1
     // (note: line 1 is the second row, since counting begins with 0):
     lcd.setCursor(0, 0);
@@ -290,10 +298,9 @@ void LCD( void *pvParameters) //LCD.
 
     int value = analogRead(sensor_water);
     lcd.setCursor(6, 0);
-    int fuelLevel=value/45;
+    int fuelLevel = value / 45;
     lcd.print(fuelLevel);
-    Serial.println(fuelLevel);
-    
+
     // print the number of seconds since reset:
     lcd.setCursor(14, 1);
     lcd.print(millis() / 1000);
@@ -307,8 +314,8 @@ void RainSensor(void *pvParameters) {
   const TickType_t xDelay = pdMS_TO_TICKS(370);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
+    xSemaphoreTake(sem_lock, portMAX_DELAY);
+    xSemaphoreGive(sem_lock);
     int sensorValue = analogRead(rainPin);
     //Serial.print(sensorValue);
     if (sensorValue < thresholdValue) {
@@ -325,41 +332,32 @@ void RainSensor(void *pvParameters) {
   }
 }
 
-void RFI_oldD(void *pvParameters) {
+void RFID(void *pvParameters) {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(500);
+  const TickType_t xDelay = pdMS_TO_TICKS(100);
   xLastWakeTime = xTaskGetTickCount();
+  byte lock = LOW;     // car is locked
   while (1) {
+    //xSemaphoreTake(sem_engine3,5);
+    digitalWrite(ledLock, lock);
+    Serial.print(lock);
     if (mfrc522.PICC_IsNewCardPresent()) {
       unsigned long uid = getID();
       if (uid != -1) {
         Serial.print("Card detected, UID: ");
         Serial.println(uid);
+        lock = !lock;
+        if (lock == HIGH)
+          xSemaphoreGive(sem_engine);
+        else
+          xSemaphoreTake(sem_engine, 50);
       }
     }
+    //  xSemaphoreGive(sem_engine3);
     vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
 }
 
-void RFID(void *pvParameters) {
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(100);
-  xLastWakeTime = xTaskGetTickCount();
-  byte leddah = LOW;
-  unsigned long uid;
-  while (1) {
-    digitalWrite(ledLock, leddah);
-    if (mfrc522.PICC_IsNewCardPresent()) {
-      unsigned long uid = getID();
-      leddah = !leddah;
-      if (uid != -1) {
-        //        Serial.print("Card detected, UID: ");
-        //        Serial.println(uid);
-      }
-    }
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
-  }
-}
 
 void Ultrasonic(void *pvParameters) {
   TickType_t xLastWakeTime;
@@ -404,12 +402,14 @@ void Engine (void *pvParameters) // buzz when belt.
   int engineStart = 0;
   int lastButtonEngineState = 0;
   while (1) {
+    xSemaphoreTake(sem_engine, 50);
+    xSemaphoreGive(sem_engine);
     buttonEngineState = digitalRead(buttonEngine);
     if (buttonEngineState != lastButtonEngineState) {
       if (buttonEngineState == HIGH) {
         digitalWrite(ledEngine, engineStart);
         if (engineStart) {
-          xSemaphoreGive(sem_engine);
+          xSemaphoreGive(sem_lock);
           int pwmOutput = 255;
           analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
           int pwmout2 = 255;
@@ -418,7 +418,7 @@ void Engine (void *pvParameters) // buzz when belt.
         else {
           analogWrite(enA, 0);
           analogWrite(enB, 0);
-          xSemaphoreTake(sem_engine, 50);
+          xSemaphoreTake(sem_lock, 50);
         }
         engineStart = !engineStart;
         //      delay(50);/
