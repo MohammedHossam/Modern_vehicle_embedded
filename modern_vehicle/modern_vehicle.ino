@@ -9,7 +9,7 @@
 SemaphoreHandle_t sem_buzzer;
 SemaphoreHandle_t sem_engine;
 SemaphoreHandle_t sem_engine2;
-SemaphoreHandle_t sem_lock;
+SemaphoreHandle_t sem_rf;
 //----------------------------------------- variables ----------------------------------------
 bool locked = false;
 bool engine = false;
@@ -80,15 +80,15 @@ void Mirrors( void *pvParameters);
 void LCD( void *pvParameters);
 void RainSensor( void *pvParameters);
 void RFID( void *pvParameters);
-///void Ultrasonic( void *pvParameters);
-//void Buzzer( void *pvParameters);
+void Ultrasonic( void *pvParameters);
+void Buzzer( void *pvParameters);
 void handler_belt( void *pvParameters);
 void setup2( );
 
 
 //------------------------------------------ Functions -----------------------------------------
 unsigned long getID() {
-  if ( ! mfrc522.PICC_ReadCardSerial()) { //Since a PICC placed get Serial and continue
+  if ( ! mfrc522.PICC_ReadCardSerial()) { //Since a PICC placed get //Serial and continue
     return -1;
   }
   unsigned long hex_num;
@@ -104,19 +104,19 @@ unsigned long getID() {
 //-------------------------------------------------------------------------------------------
 
 void setup() {
-  Serial.begin(9600);
+  //Serial.begin(9600);
   // ---------------- RFID
-  //while (!Serial);    // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
+  //while (!//Serial);    // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
   SPI.begin();      // Init SPI bus
   mfrc522.PCD_Init();   // Init MFRC522
   delay(4);       // Optional delay. Some board do need more time after init to be ready, see Readme
-  mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
-  Serial.println(F("Scan PICC to see UID, SAK, type, and data blocks..."));
+  //  mfrc522.PCD_DumpVersionTo//Serial();  // Show details of PCD - MFRC522 Card Reader details
+  //Serial.println(F("Scan PICC to see UID, SAK, type, and data blocks..."));
 
   //---------------semphrs
   sem_buzzer = xSemaphoreCreateCounting( 2, 0 );
-  sem_engine = xSemaphoreCreateCounting( 1, 0 );
-  sem_lock = xSemaphoreCreateCounting(1, 0);
+  sem_engine = xSemaphoreCreateCounting( 1, 1);
+  sem_rf = xSemaphoreCreateCounting(1, 0);
 
   //--------------SeatBelt
   pinMode(ledPin, OUTPUT);
@@ -166,11 +166,11 @@ void setup() {
 
 
   // -----------------------------
-  xTaskCreate (Buzzer, "Buzzer", 500, NULL, 1, NULL);
-  xTaskCreate (handler_belt, "belt_handler", 500, NULL, 1, NULL);
+  //  xTaskCreate (Buzzer, "Buzzer", 500, NULL, 1, NULL);
+  //  xTaskCreate (handler_belt, "belt_handler", 500, NULL, 1, NULL);
   xTaskCreate (Engine, "Engine", 1000, NULL, 1, NULL);
 
-  xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
+  //xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
 
   xTaskCreate (LCD, "LCD", 1500, NULL, 1, NULL);
   xTaskCreate (RainSensor, "RainSensor", 1000, NULL, 1, NULL);
@@ -222,8 +222,8 @@ void Buzzer (void *pvParameters) // buzz when belt.
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     digitalWrite(buzzer, LOW);
-      xSemaphoreTake(sem_lock, portMAX_DELAY);
-    xSemaphoreGive(sem_lock);
+    xSemaphoreTake(sem_engine, portMAX_DELAY);
+    xSemaphoreGive(sem_engine);
     xSemaphoreTake(sem_buzzer, portMAX_DELAY);
     digitalWrite(buzzer, HIGH);
     delay(100);
@@ -238,8 +238,8 @@ void Mirrors (void *pvParameters) // Mirrors.
   const TickType_t xDelay = pdMS_TO_TICKS(25);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
-      xSemaphoreTake(sem_lock, portMAX_DELAY);
-    xSemaphoreGive(sem_lock);
+    xSemaphoreTake(sem_engine, portMAX_DELAY);
+    xSemaphoreGive(sem_engine);
     valx = analogRead(x);
     valy = analogRead(y);
 
@@ -281,8 +281,8 @@ void LCD( void *pvParameters) //LCD.
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     lcd.clear();
-     xSemaphoreTake(sem_lock, portMAX_DELAY);
-    xSemaphoreGive(sem_lock);
+    xSemaphoreTake(sem_engine, portMAX_DELAY);
+    xSemaphoreGive(sem_engine);
     // set the cursor to column 0, row 1
     // (note: line 1 is the second row, since counting begins with 0):
     lcd.setCursor(0, 0);
@@ -314,17 +314,17 @@ void RainSensor(void *pvParameters) {
   const TickType_t xDelay = pdMS_TO_TICKS(370);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
-    xSemaphoreTake(sem_lock, portMAX_DELAY);
-    xSemaphoreGive(sem_lock);
+    xSemaphoreTake(sem_engine, portMAX_DELAY);
+    xSemaphoreGive(sem_engine);
     int sensorValue = analogRead(rainPin);
-    //Serial.print(sensorValue);
+    ////Serial.print(sensorValue);
     if (sensorValue < thresholdValue) {
-      Serial.println(" - It's wet");
+      //Serial.println(" - It's wet");
       rain = "wet";
 
     }
     else {
-      //Serial.println(" - It's dry");
+      ////Serial.println(" - It's dry");
       rain = "dry";
     }
 
@@ -340,17 +340,20 @@ void RFID(void *pvParameters) {
   while (1) {
     //xSemaphoreTake(sem_engine3,5);
     digitalWrite(ledLock, lock);
-    Serial.print(lock);
+    //Serial.print(lock);
     if (mfrc522.PICC_IsNewCardPresent()) {
       unsigned long uid = getID();
       if (uid != -1) {
-        Serial.print("Card detected, UID: ");
-        Serial.println(uid);
+        //Serial.print("Card detected, UID: ");
+        //Serial.println(uid);
         lock = !lock;
-        if (lock == HIGH)
-          xSemaphoreGive(sem_engine);
-        else
-          xSemaphoreTake(sem_engine, 50);
+        if (lock == HIGH) {
+          xSemaphoreGive(sem_rf);
+          //   delay(10);
+        }
+        else {
+           xSemaphoreTake(sem_rf, portMAX_DELAY);
+        }
       }
     }
     //  xSemaphoreGive(sem_engine3);
@@ -376,14 +379,14 @@ void Ultrasonic(void *pvParameters) {
     duration = pulseIn(echoPin, HIGH);
     // Calculating the distance
     distance = duration * 0.034 / 2;
-    // Prints the distance on the Serial Monitor
+    // Prints the distance on the //Serial Monitor
     if (distance <= 10) {
       //      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       //      digitalWrite(buzzer, HIGH);
       xSemaphoreGive(sem_buzzer);
 
-      Serial.print("Distance: ");
-      Serial.println(distance);
+      //Serial.print("Distance: ");
+      //Serial.println(distance);
     }
     //    else {
     //      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
@@ -401,15 +404,19 @@ void Engine (void *pvParameters) // buzz when belt.
   xLastWakeTime = xTaskGetTickCount();
   int engineStart = 0;
   int lastButtonEngineState = 0;
+  int count = 0;
   while (1) {
-    xSemaphoreTake(sem_engine, 50);
-    xSemaphoreGive(sem_engine);
+    count++;
+    // delay(10);
+    // digitalWrite(ledPin,LOW);
+    // delay(10);
     buttonEngineState = digitalRead(buttonEngine);
     if (buttonEngineState != lastButtonEngineState) {
       if (buttonEngineState == HIGH) {
-        digitalWrite(ledEngine, engineStart);
         if (engineStart) {
-          xSemaphoreGive(sem_lock);
+          xSemaphoreTake(sem_rf, portMAX_DELAY);
+          xSemaphoreGive(sem_engine);
+          //  delay(10);
           int pwmOutput = 255;
           analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
           int pwmout2 = 255;
@@ -418,8 +425,12 @@ void Engine (void *pvParameters) // buzz when belt.
         else {
           analogWrite(enA, 0);
           analogWrite(enB, 0);
-          xSemaphoreTake(sem_lock, 50);
+          digitalWrite(ledPin,LOW);
+          xSemaphoreTake(sem_engine, portMAX_DELAY);
+          xSemaphoreGive(sem_rf);
+          //  delay(10);
         }
+        digitalWrite(ledEngine, engineStart);
         engineStart = !engineStart;
         //      delay(50);/
       }
