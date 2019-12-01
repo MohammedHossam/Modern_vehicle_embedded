@@ -16,13 +16,13 @@ bool engine = false;
 bool seatBelt = false;
 
 //------------------ Engine
-const int buttonEngine = 47;
-const int ledEngine =  34;
+const int buttonEngine = 48;    //47
+const int ledEngine =  41;
 int buttonEngineState = 0;        // variable for reading the pushbutton status
 #define enA 5
 #define in1 24
 #define in2 25
-#define enB 3
+#define enB 4   // 3=> 4
 #define inB1 27
 #define inB2 26
 
@@ -44,27 +44,27 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 char* rain = malloc(sizeof(char) * 3);
 
 //-----------------push button seatbelt
-int seatPush = 49;
+int seatPush = 46;          //49
 int buttonState = 0;         // variable for reading the pushbutton status
 int lastButtonState = 0;
 int buzzerState = 0;
-int ledPin =  35;
-int buzzer = 36;
+int ledPin =  42;   //35
+int buzzer = 3;   //36
 
 //--------------- Fuel Level
-int sensor_water = A3;
+int sensor_water = A2;  //A3
 
 //----------------- rain sensor
 
-int rainPin = A2;
+int rainPin = A3;  // A2
 
 // you can adjust the threshold value
 int thresholdValue = 500;
 
 //------------------ RFID
-#define RST_PIN         39          // Configurable, see typical pin layout above
-#define SS_PIN          53         // Configurable, see typical pin layout above
-#define ledLock         30
+#define SS_PIN        53         // Configurable, see typical pin layout above
+#define RST_PIN       39          // Configurable, see typical pin layout above
+#define ledLock       43    //30
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
 //------------------- Ultrasonic
@@ -149,8 +149,8 @@ void setup() {
   //   ------------Mirrors setup
   pinMode(x, INPUT);
   pinMode(y, INPUT);
-  servoRight.attach(40);
-  servoLeft.attach(41);
+  servoRight.attach(47);  //40
+  servoLeft.attach(44); //41
 
   // ------------lcd setup
   lcd.begin(16, 2);
