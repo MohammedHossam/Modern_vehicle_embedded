@@ -115,7 +115,7 @@ void setup() {
 
   //---------------semphrs
   sem_buzzer = xSemaphoreCreateCounting( 2, 0 );
-  sem_engine = xSemaphoreCreateCounting( 1, 1);
+  sem_engine = xSemaphoreCreateCounting( 1,0);
   sem_rf = xSemaphoreCreateCounting(1, 0);
 
   //--------------SeatBelt
@@ -352,7 +352,7 @@ void RFID(void *pvParameters) {
           //   delay(10);
         }
         else {
-           xSemaphoreTake(sem_rf, portMAX_DELAY);
+          xSemaphoreTake(sem_rf, portMAX_DELAY);
         }
       }
     }
@@ -406,37 +406,42 @@ void Engine (void *pvParameters) // buzz when belt.
   int lastButtonEngineState = 0;
   int count = 0;
   while (1) {
-    count++;
     // delay(10);
     // digitalWrite(ledPin,LOW);
     // delay(10);
     buttonEngineState = digitalRead(buttonEngine);
     if (buttonEngineState != lastButtonEngineState) {
-      if (buttonEngineState == HIGH) {
-        if (engineStart) {
-          xSemaphoreTake(sem_rf, portMAX_DELAY);
-          xSemaphoreGive(sem_engine);
-          //  delay(10);
-          int pwmOutput = 255;
-          analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
-          int pwmout2 = 255;
-          analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
-        }
-        else {
-          analogWrite(enA, 0);
-          analogWrite(enB, 0);
-          digitalWrite(ledPin,LOW);
-          xSemaphoreTake(sem_engine, portMAX_DELAY);
-          xSemaphoreGive(sem_rf);
-          //  delay(10);
-        }
-        digitalWrite(ledEngine, engineStart);
-        engineStart = !engineStart;
-        //      delay(50);/
-      }
-    }
+          engineStart = !engineStart;
+      count++;
+      if (count > 1) {
+        xSemaphoreTake(sem_rf, portMAX_DELAY);
+        xSemaphoreGive(sem_rf);
+        if (buttonEngineState == HIGH) {
+          if (engineStart) {
+            xSemaphoreGive(sem_engine);
+            //  delay(10);
+            int pwmOutput = 255;
+            analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
+            int pwmout2 = 255;
+            analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
+          }
+          else {
+            analogWrite(enA, 0);
+            analogWrite(enB, 0);
+            digitalWrite(ledPin, LOW);
+            xSemaphoreTake(sem_engine, portMAX_DELAY);
+            xSemaphoreGive(sem_rf);
+            //  delay(10);
+          }
+          digitalWrite(ledEngine, engineStart);
 
-    lastButtonEngineState = buttonEngineState;
+          //      delay(50);/
+        }
+      }
+
+      lastButtonEngineState = buttonEngineState;
+
+    }
     vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
 }
