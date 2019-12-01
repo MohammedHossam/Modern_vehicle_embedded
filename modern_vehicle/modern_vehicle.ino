@@ -179,7 +179,7 @@ void setup() {
   xTaskCreate (RainSensor, "RainSensor", 400, NULL, 1, NULL);
   xTaskCreate (RFID, "RFID", 500, NULL, 2, NULL);
 
-  xTaskCreate (Ultrasonic, "Ultrasonic", 300, NULL, 1, NULL);
+  xTaskCreate (Ultrasonic, "Ultrasonic", 300, NULL, 2, NULL);
 
   //---------------------------------
 
@@ -305,7 +305,7 @@ void LCD( void *pvParameters) //LCD.
     lcd.print("R");
     lcd.setCursor(1, 0);
     lcd.print(servoRAngle);
-    
+
     lcd.setCursor(0, 1);
     lcd.print("L");
     lcd.setCursor(1, 1);
@@ -315,8 +315,8 @@ void LCD( void *pvParameters) //LCD.
     lcd.print("Belt");
     lcd.setCursor(7, 1);
     lcd.print(beltDisplay);
-    
-    
+
+
     lcd.setCursor(12, 1);
     lcd.print(rain);
 
@@ -326,10 +326,6 @@ void LCD( void *pvParameters) //LCD.
     lcd.setCursor(13, 0);
     int fuelLevel = value / 45;
     lcd.print(fuelLevel);
-
-
-    
-
 
     //lcd.setCursor(14, 1);
     //lcd.print(millis() / 1000);
@@ -411,6 +407,9 @@ void Ultrasonic(void *pvParameters) {
     distance = duration * 0.034 / 2;
     // Prints the distance on the //Serial Monitor
     if (distance <= 10) {
+      analogWrite(enA, 0);
+      analogWrite(enB, 0);
+      
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, HIGH);
       xSemaphoreGive(sem_buzzer);
@@ -419,8 +418,12 @@ void Ultrasonic(void *pvParameters) {
       Serial.println(distance);
     }
     else {
+      int pwmOutput = 255;
+      analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
+      int pwmout2 = 255;
+      analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
+      
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-
       digitalWrite(buzzer, LOW);
       xSemaphoreGive(sem_buzzer);
     }
@@ -437,9 +440,6 @@ void Engine (void *pvParameters) // buzz when belt.
   int lastButtonEngineState = 0;
   int count = 0;
   while (1) {
-    // delay(10);
-    // digitalWrite(ledPin,LOW);
-    // delay(10);
     xSemaphoreTake(sem_rf, portMAX_DELAY);
     buttonEngineState = digitalRead(buttonEngine);
     if (buttonEngineState != lastButtonEngineState) {
@@ -450,25 +450,21 @@ void Engine (void *pvParameters) // buzz when belt.
           if (engineStart) {
             xSemaphoreTake(sem_engineOut, portMAX_DELAY);
             xSemaphoreGive(sem_engine);
-            //  delay(10);
             int pwmOutput = 255;
             analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
             int pwmout2 = 255;
             analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
+            digitalWrite(ledEngine, engineStart);
           }
           else {
             analogWrite(enA, 0);
             analogWrite(enB, 0);
+            digitalWrite(ledEngine, engineStart);
             //digitalWrite(ledPin, LOW);
             xSemaphoreTake(sem_engine, portMAX_DELAY);
             xSemaphoreGive(sem_rf);
             xSemaphoreGive(sem_engineOut);
-
-            //  delay(10);
           }
-          digitalWrite(ledEngine, engineStart);
-
-          //      delay(50);/
         }
       }
 
