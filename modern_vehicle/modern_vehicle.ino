@@ -164,8 +164,8 @@ void setup() {
   digitalWrite(ledLock, LOW);
 
   //  //-------------- Ultrasonic
-  //  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
-  //  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
 
 
   // -----------------------------
@@ -174,10 +174,10 @@ void setup() {
   xTaskCreate (Engine, "Engine", 1000, NULL, 1, NULL);
   xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
   xTaskCreate (LCD, "LCD", 1500, NULL, 1, NULL);
-  xTaskCreate (RainSensor, "RainSensor", 1000, NULL, 1, NULL);
-  xTaskCreate (RFID, "RFID", 1000, NULL, 2, NULL);
+  xTaskCreate (RainSensor, "RainSensor", 400, NULL, 1, NULL);
+  xTaskCreate (RFID, "RFID", 500, NULL, 2, NULL);
 
- // xTaskCreate (Ultrasonic, "Ultrasonic", 1000, NULL, 1, NULL);
+  xTaskCreate (Ultrasonic, "Ultrasonic", 300, NULL, 1, NULL);
 
   //---------------------------------
 
@@ -197,8 +197,8 @@ void handler_belt(void *pvParameters)
   int count = 0;
   while (1) {
     digitalWrite(buzzer, LOW);
-        xSemaphoreTake(sem_engine, portMAX_DELAY);
-        xSemaphoreGive(sem_engine);
+    xSemaphoreTake(sem_engine, portMAX_DELAY);
+    xSemaphoreGive(sem_engine);
     buttonState = digitalRead(seatPush);
     if (buttonState != lastButtonState) {
       if (buttonState == HIGH) {
@@ -212,10 +212,11 @@ void handler_belt(void *pvParameters)
     if (ledLight == HIGH) {
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, HIGH);
+      Serial.println("dasdas");
       xSemaphoreGive(sem_buzzer);
     }
-    else{
-       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+    else {
+      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, LOW);
       xSemaphoreGive(sem_buzzer);
     }
@@ -353,7 +354,7 @@ void RFID(void *pvParameters) {
     //Serial.print(lock);
     if (mfrc522.PICC_IsNewCardPresent()) {
       unsigned long uid = getID();
-      if (uid != -1) {
+      if (uid == 21043 ) {  //4294934562
         //Serial.print("Card detected, UID: ");
         //Serial.println(uid);
         lock = !lock;
@@ -379,6 +380,7 @@ void Ultrasonic(void *pvParameters) {
   while (1) {
     xSemaphoreTake(sem_engine, portMAX_DELAY);
     xSemaphoreGive(sem_engine);
+    Serial.println("dasdas");
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2);
     // Sets the trigPin on HIGH state for 10 micro seconds
@@ -393,11 +395,14 @@ void Ultrasonic(void *pvParameters) {
     if (distance <= 10) {
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, HIGH);
+      xSemaphoreGive(sem_buzzer);
 
-      //Serial.print("Distance: ");
-      //Serial.println(distance);
+      Serial.print("Distance: ");
+      Serial.println(distance);
     }
     else {
+      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+
       digitalWrite(buzzer, LOW);
       xSemaphoreGive(sem_buzzer);
     }
