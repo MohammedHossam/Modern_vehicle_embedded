@@ -114,7 +114,7 @@ void setup() {
   //Serial.println(F("Scan PICC to see UID, SAK, type, and data blocks..."));
 
   //---------------semphrs
-  sem_buzzer = xSemaphoreCreateCounting( 2, 0 );
+  sem_buzzer = xSemaphoreCreateCounting( 1, 1 );
   sem_engine = xSemaphoreCreateCounting( 1, 0);
   sem_rf = xSemaphoreCreateCounting(1, 0);
   sem_engineOut = xSemaphoreCreateMutex();
@@ -169,17 +169,15 @@ void setup() {
 
 
   // -----------------------------
-  //  xTaskCreate (Buzzer, "Buzzer", 500, NULL, 1, NULL);
-  //  xTaskCreate (handler_belt, "belt_handler", 500, NULL, 1, NULL);
+  // xTaskCreate (Buzzer, "Buzzer", 1000, NULL, 1, NULL);
+  xTaskCreate (handler_belt, "belt_handler", 500, NULL, 1, NULL);
   xTaskCreate (Engine, "Engine", 1000, NULL, 1, NULL);
-
-  //xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
-
+  xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
   xTaskCreate (LCD, "LCD", 1500, NULL, 1, NULL);
   xTaskCreate (RainSensor, "RainSensor", 1000, NULL, 1, NULL);
   xTaskCreate (RFID, "RFID", 1000, NULL, 2, NULL);
 
-  //  xTaskCreate (Ultrasonic, "Ultrasonic", 1000, NULL, 1, NULL);
+ // xTaskCreate (Ultrasonic, "Ultrasonic", 1000, NULL, 1, NULL);
 
   //---------------------------------
 
@@ -198,8 +196,9 @@ void handler_belt(void *pvParameters)
   int ledLight = 0;
   int count = 0;
   while (1) {
-    //    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    //    xSemaphoreGive(sem_engine);
+    digitalWrite(buzzer, LOW);
+        xSemaphoreTake(sem_engine, portMAX_DELAY);
+        xSemaphoreGive(sem_engine);
     buttonState = digitalRead(seatPush);
     if (buttonState != lastButtonState) {
       if (buttonState == HIGH) {
@@ -210,8 +209,16 @@ void handler_belt(void *pvParameters)
 
       }
     }
-    if (ledLight == HIGH)
+    if (ledLight == HIGH) {
+      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+      digitalWrite(buzzer, HIGH);
       xSemaphoreGive(sem_buzzer);
+    }
+    else{
+       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+      digitalWrite(buzzer, LOW);
+      xSemaphoreGive(sem_buzzer);
+    }
     delay(50);
     lastButtonState = buttonState;
     vTaskDelayUntil(&xLastWakeTime, xDelay);
@@ -221,13 +228,13 @@ void handler_belt(void *pvParameters)
 void Buzzer (void *pvParameters) // buzz when belt.
 {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(25);
+  const TickType_t xDelay = pdMS_TO_TICKS(150);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     digitalWrite(buzzer, LOW);
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
-    xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+    //xSemaphoreTake(sem_engine, portMAX_DELAY);
+    //xSemaphoreGive(sem_engine);
+    //    xSemaphoreTake(sem_buzzer, portMAX_DELAY);
     digitalWrite(buzzer, HIGH);
     delay(100);
     vTaskDelayUntil(&xLastWakeTime, xDelay);
@@ -384,18 +391,16 @@ void Ultrasonic(void *pvParameters) {
     distance = duration * 0.034 / 2;
     // Prints the distance on the //Serial Monitor
     if (distance <= 10) {
-      //      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-      //      digitalWrite(buzzer, HIGH);
-      xSemaphoreGive(sem_buzzer);
+      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+      digitalWrite(buzzer, HIGH);
 
       //Serial.print("Distance: ");
       //Serial.println(distance);
     }
-    //    else {
-    //      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-    //      digitalWrite(buzzer, LOW);
-    //      xSemaphoreGive(sem_buzzer);
-    //    }
+    else {
+      digitalWrite(buzzer, LOW);
+      xSemaphoreGive(sem_buzzer);
+    }
     vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
 }
