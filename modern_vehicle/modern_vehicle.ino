@@ -8,7 +8,7 @@
 //-------------------------------------------semaphors--------------------------------
 SemaphoreHandle_t sem_buzzer;
 SemaphoreHandle_t sem_engine;
-SemaphoreHandle_t sem_engine2;
+SemaphoreHandle_t sem_engineOut;
 SemaphoreHandle_t sem_rf;
 //----------------------------------------- variables ----------------------------------------
 bool locked = false;
@@ -117,6 +117,9 @@ void setup() {
   sem_buzzer = xSemaphoreCreateCounting( 2, 0 );
   sem_engine = xSemaphoreCreateCounting( 1, 0);
   sem_rf = xSemaphoreCreateCounting(1, 0);
+  sem_engineOut = xSemaphoreCreateMutex();
+  if (sem_engineOut != NULL)
+    xSemaphoreGive(sem_engineOut);
 
   //--------------SeatBelt
   pinMode(ledPin, OUTPUT);
@@ -338,7 +341,7 @@ void RFID(void *pvParameters) {
   xLastWakeTime = xTaskGetTickCount();
   byte lock = LOW;     // car is locked
   while (1) {
-    //xSemaphoreTake(sem_engine3,5);
+    xSemaphoreTake(sem_engineOut, portMAX_DELAY);
     digitalWrite(ledLock, lock);
     //Serial.print(lock);
     if (mfrc522.PICC_IsNewCardPresent()) {
@@ -356,7 +359,7 @@ void RFID(void *pvParameters) {
         }
       }
     }
-    //  xSemaphoreGive(sem_engine3);
+    xSemaphoreGive(sem_engineOut);
     vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
 }
@@ -417,6 +420,7 @@ void Engine (void *pvParameters) // buzz when belt.
         if (count > 1) {
           engineStart = !engineStart;
           if (engineStart) {
+            xSemaphoreTake(sem_engineOut, portMAX_DELAY);
             xSemaphoreGive(sem_engine);
             //  delay(10);
             int pwmOutput = 255;
@@ -430,6 +434,8 @@ void Engine (void *pvParameters) // buzz when belt.
             //digitalWrite(ledPin, LOW);
             xSemaphoreTake(sem_engine, portMAX_DELAY);
             xSemaphoreGive(sem_rf);
+            xSemaphoreGive(sem_engineOut);
+
             //  delay(10);
           }
           digitalWrite(ledEngine, engineStart);
