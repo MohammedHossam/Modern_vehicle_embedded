@@ -42,6 +42,8 @@ Servo servoLeft;
 const int rs = 11, en = 10, d4 = 9 , d5 = 8, d6 = 7, d7 = 6;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 char* rain = malloc(sizeof(char) * 3);
+char* beltDisplay = malloc(sizeof(char) * 3);
+
 
 //-----------------push button seatbelt
 int seatPush = 46;          //49
@@ -204,6 +206,7 @@ void handler_belt(void *pvParameters)
       if (buttonState == HIGH) {
         ledLight = !ledLight;
         digitalWrite(ledPin, ledLight);
+        beltDisplay = ledLight ? "Off" : "ON";
         //  xSemaphoreTake(sem_buzzer, portMAX_DELAY);
         //digitalWrite(buzzer, ledLight);
 
@@ -296,25 +299,40 @@ void LCD( void *pvParameters) //LCD.
     xSemaphoreGive(sem_engine);
     // set the cursor to column 0, row 1
     // (note: line 1 is the second row, since counting begins with 0):
+
+    // Second row
     lcd.setCursor(0, 0);
-    lcd.print(rain);
-    lcd.setCursor(0, 1);
     lcd.print("R");
-    lcd.setCursor(1, 1);
+    lcd.setCursor(1, 0);
     lcd.print(servoRAngle);
-    lcd.setCursor(5, 1);
+    
+    lcd.setCursor(0, 1);
     lcd.print("L");
-    lcd.setCursor(6, 1);
+    lcd.setCursor(1, 1);
     lcd.print(servoLAngle);
 
-    int value = analogRead(sensor_water);
     lcd.setCursor(6, 0);
+    lcd.print("Belt");
+    lcd.setCursor(7, 1);
+    lcd.print(beltDisplay);
+    
+    
+    lcd.setCursor(12, 1);
+    lcd.print(rain);
+
+    int value = analogRead(sensor_water);
+    lcd.setCursor(12, 0);
+    lcd.print("F");
+    lcd.setCursor(13, 0);
     int fuelLevel = value / 45;
     lcd.print(fuelLevel);
 
-    // print the number of seconds since reset:
-    lcd.setCursor(14, 1);
-    lcd.print(millis() / 1000);
+
+    
+
+
+    //lcd.setCursor(14, 1);
+    //lcd.print(millis() / 1000);
     vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
 
