@@ -65,13 +65,14 @@ int thresholdValue = 500;
 
 //------------------ RFID
 #define SS_PIN        53         // Configurable, see typical pin layout above
-#define RST_PIN       39          // Configurable, see typical pin layout above
+#define RST_PIN       49          // Configurable, see typical pin layout above
 #define ledLock       43    //30
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
 //------------------- Ultrasonic
 const int trigPin = 13;
 const int echoPin = 12;
+const int ultraBuzzer = 39;
 // defines variables
 long duration;
 int distance;
@@ -168,18 +169,19 @@ void setup() {
   //  //-------------- Ultrasonic
   pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
   pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+  pinMode(ultraBuzzer, OUTPUT);
+  digitalWrite(ultraBuzzer, LOW);
 
 
   // -----------------------------
   // xTaskCreate (Buzzer, "Buzzer", 1000, NULL, 1, NULL);
-  xTaskCreate (handler_belt, "belt_handler", 500, NULL, 1, NULL);
-  xTaskCreate (Engine, "Engine", 1000, NULL, 1, NULL);
-  xTaskCreate (Mirrors, "Mirrors", 1000, NULL, 1, NULL);
-  xTaskCreate (LCD, "LCD", 1500, NULL, 1, NULL);
-  xTaskCreate (RainSensor, "RainSensor", 400, NULL, 1, NULL);
-  xTaskCreate (RFID, "RFID", 500, NULL, 2, NULL);
-
-  xTaskCreate (Ultrasonic, "Ultrasonic", 300, NULL, 2, NULL);
+  xTaskCreate (handler_belt, "belt_handler", 500, NULL, 2, NULL);
+  xTaskCreate (Engine, "Engine", 500, NULL, 3, NULL);
+  xTaskCreate (Mirrors, "Mirrors", 300, NULL, 2, NULL);
+  xTaskCreate (LCD, "LCD", 1000, NULL, 2, NULL);
+  xTaskCreate (RainSensor, "RainSensor", 400, NULL, 2, NULL);
+  xTaskCreate (RFID, "RFID", 500, NULL, 1, NULL);
+  xTaskCreate (Ultrasonic, "Ultrasonic", 300, NULL, 3, NULL);
 
   //---------------------------------
 
@@ -193,12 +195,11 @@ void setup() {
 void handler_belt(void *pvParameters)
 {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(47);
+  const TickType_t xDelay = pdMS_TO_TICKS(190);
   xLastWakeTime = xTaskGetTickCount();
   int ledLight = 0;
   int count = 0;
   while (1) {
-    digitalWrite(buzzer, LOW);
     xSemaphoreTake(sem_engine, portMAX_DELAY);
     xSemaphoreGive(sem_engine);
     buttonState = digitalRead(seatPush);
@@ -210,18 +211,18 @@ void handler_belt(void *pvParameters)
         //  xSemaphoreTake(sem_buzzer, portMAX_DELAY);
         //digitalWrite(buzzer, ledLight);
 
-      }
-    }
     if (ledLight == HIGH) {
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, HIGH);
-      Serial.println("dasdas");
       xSemaphoreGive(sem_buzzer);
+      Serial.println("dasdas");
     }
     else {
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, LOW);
       xSemaphoreGive(sem_buzzer);
+    }
+      }
     }
     delay(50);
     lastButtonState = buttonState;
@@ -249,7 +250,7 @@ void Buzzer (void *pvParameters) // buzz when belt.
 void Mirrors (void *pvParameters) // Mirrors.
 {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(25);
+  const TickType_t xDelay = pdMS_TO_TICKS(150);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     xSemaphoreTake(sem_engine, portMAX_DELAY);
@@ -261,13 +262,13 @@ void Mirrors (void *pvParameters) // Mirrors.
       servoRAngle += 2; //right
     }
     else if (valx > 682) {
-      servoRAngle -= 2;
+      servoRAngle -= 3;
     }
     if (valy < 341) {
-      servoLAngle += 2;
+      servoLAngle += 3;
     }
     else if (valy > 682) {
-      servoLAngle -= 2;
+      servoLAngle -= 3;
     }
     if (servoRAngle < 0) {
       servoRAngle = 0;
@@ -291,7 +292,7 @@ void Mirrors (void *pvParameters) // Mirrors.
 void LCD( void *pvParameters) //LCD.
 {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(200);
+  const TickType_t xDelay = pdMS_TO_TICKS(180);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     lcd.clear();
@@ -336,7 +337,7 @@ void LCD( void *pvParameters) //LCD.
 
 void RainSensor(void *pvParameters) {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(370);
+  const TickType_t xDelay = pdMS_TO_TICKS(240);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     xSemaphoreTake(sem_engine, portMAX_DELAY);
@@ -359,7 +360,7 @@ void RainSensor(void *pvParameters) {
 
 void RFID(void *pvParameters) {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(100);
+  const TickType_t xDelay = pdMS_TO_TICKS(300);
   xLastWakeTime = xTaskGetTickCount();
   byte lock = LOW;     // car is locked
   while (1) {
@@ -389,7 +390,7 @@ void RFID(void *pvParameters) {
 
 void Ultrasonic(void *pvParameters) {
   TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(107);
+  const TickType_t xDelay = pdMS_TO_TICKS(50);
   xLastWakeTime = xTaskGetTickCount();
   while (1) {
     xSemaphoreTake(sem_engine, portMAX_DELAY);
@@ -409,22 +410,22 @@ void Ultrasonic(void *pvParameters) {
     if (distance <= 10) {
       analogWrite(enA, 0);
       analogWrite(enB, 0);
-      
+
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-      digitalWrite(buzzer, HIGH);
+      digitalWrite(ultraBuzzer, HIGH);
       xSemaphoreGive(sem_buzzer);
 
       Serial.print("Distance: ");
       Serial.println(distance);
     }
     else {
-      int pwmOutput = 255;
-      analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
-      int pwmout2 = 255;
-      analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
-      
+      //      int pwmOutput = 255;
+      //      analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
+      //      int pwmout2 = 255;
+      //      analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
+
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-      digitalWrite(buzzer, LOW);
+      digitalWrite(ultraBuzzer, LOW);
       xSemaphoreGive(sem_buzzer);
     }
     vTaskDelayUntil(&xLastWakeTime, xDelay);
@@ -450,15 +451,12 @@ void Engine (void *pvParameters) // buzz when belt.
           if (engineStart) {
             xSemaphoreTake(sem_engineOut, portMAX_DELAY);
             xSemaphoreGive(sem_engine);
-            int pwmOutput = 255;
-            analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
-            int pwmout2 = 255;
-            analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
             digitalWrite(ledEngine, engineStart);
           }
           else {
             analogWrite(enA, 0);
             analogWrite(enB, 0);
+            digitalWrite(buzzer, LOW);
             digitalWrite(ledEngine, engineStart);
             //digitalWrite(ledPin, LOW);
             xSemaphoreTake(sem_engine, portMAX_DELAY);
@@ -472,6 +470,16 @@ void Engine (void *pvParameters) // buzz when belt.
 
     }
     xSemaphoreGive(sem_rf);
+    if (engineStart) {
+      int pwmOutput = 255;
+      analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin5
+      int pwmout2 = 255;
+      analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
+    }
+    else {
+      analogWrite(enA, 0);
+      analogWrite(enB, 0);
+    }
     vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
 }
