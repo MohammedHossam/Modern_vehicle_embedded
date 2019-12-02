@@ -79,6 +79,7 @@ int distance;
 
 //----------------------------------- define tasks -------------------------------------------
 
+void Engine( void *pvParameters);
 void Mirrors( void *pvParameters);
 void LCD( void *pvParameters);
 void RainSensor( void *pvParameters);
@@ -107,7 +108,9 @@ unsigned long getID() {
 //-------------------------------------------------------------------------------------------
 
 void setup() {
-  //Serial.begin(9600);
+  Serial1.begin(9600);
+
+  Serial.begin(9600);
   // ---------------- RFID
   //while (!//Serial);    // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
   SPI.begin();      // Init SPI bus
@@ -174,13 +177,13 @@ void setup() {
 
 
   // -----------------------------
-  // xTaskCreate (Buzzer, "Buzzer", 1000, NULL, 1, NULL);
+  xTaskCreate (Buzzer, "Buzzer", 300, NULL, 1, NULL);
   xTaskCreate (handler_belt, "belt_handler", 500, NULL, 2, NULL);
   xTaskCreate (Engine, "Engine", 500, NULL, 3, NULL);
   xTaskCreate (Mirrors, "Mirrors", 300, NULL, 2, NULL);
-  xTaskCreate (LCD, "LCD", 1000, NULL, 2, NULL);
+  xTaskCreate (LCD, "LCD", 700, NULL, 2, NULL);
   xTaskCreate (RainSensor, "RainSensor", 400, NULL, 2, NULL);
-  xTaskCreate (RFID, "RFID", 500, NULL, 1, NULL);
+  xTaskCreate (RFID, "RFID", 500, NULL, 2, NULL);
   xTaskCreate (Ultrasonic, "Ultrasonic", 300, NULL, 3, NULL);
 
   //---------------------------------
@@ -228,280 +231,296 @@ void handler_belt(void *pvParameters)
   }
 }//
 void Buzzer (void *pvParameters) // buzz when belt.
-{
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(150);
-  xLastWakeTime = xTaskGetTickCount();
+{ int BluetoothData;
+  int movement = 0;
   while (1) {
-    digitalWrite(buzzer, LOW);
-    //xSemaphoreTake(sem_engine, portMAX_DELAY);
-    //xSemaphoreGive(sem_engine);
-    //    xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-    digitalWrite(buzzer, HIGH);
-    delay(100);
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
-
+    if (Serial1.available()) {
+      BluetoothData = Serial1.read();
+      // digitalWrite(ledpin,1);
+      if (BluetoothData == 49) movement = 1;
+      else if (BluetoothData == 51)movement = -1;
+      else if (BluetoothData == 83)movement = 0;
+      Serial.println(BluetoothData);
+   }
+   if (movement == 1) {
+      digitalWrite(in1, LOW);
+      digitalWrite(in2, HIGH);
+      digitalWrite(inB1, LOW);
+      digitalWrite(inB2, HIGH);
+    }
+    else if (movement == -1) {
+      digitalWrite(in1, HIGH);
+      digitalWrite(in2, LOW);
+      digitalWrite(inB1, HIGH);
+      digitalWrite(inB2, LOW);
+    }
+    else if (movement == 0) {
+      digitalWrite(in1, LOW);
+      digitalWrite(in2, LOW);
+      digitalWrite(inB1, LOW);
+      digitalWrite(inB2, LOW);
+    }
   }
 }
 
-void Mirrors (void *pvParameters) // Mirrors.
-{
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(150);
-  xLastWakeTime = xTaskGetTickCount();
-  while (1) {
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
-    valx = analogRead(x);
-    valy = analogRead(y);
+  void Mirrors (void *pvParameters) // Mirrors.
+  {
+    TickType_t xLastWakeTime;
+    const TickType_t xDelay = pdMS_TO_TICKS(150);
+    xLastWakeTime = xTaskGetTickCount();
+    while (1) {
+      xSemaphoreTake(sem_engine, portMAX_DELAY);
+      xSemaphoreGive(sem_engine);
+      valx = analogRead(x);
+      valy = analogRead(y);
 
-    if (valx < 341) {
-      servoRAngle += 2; //right
-    }
-    else if (valx > 682) {
-      servoRAngle -= 3;
-    }
-    if (valy < 341) {
-      servoLAngle += 3;
-    }
-    else if (valy > 682) {
-      servoLAngle -= 3;
-    }
-    if (servoRAngle < 0) {
-      servoRAngle = 0;
-    }
-    if (servoRAngle > 90) {
-      servoRAngle = 90;
-    }
-    if (servoLAngle < 90) {
-      servoLAngle = 90;
-    }
-    if (servoLAngle > 180) {
-      servoLAngle = 180;
-    }
-    servoRight.write(servoRAngle);
-    servoLeft.write(servoLAngle);
-    delay(15);
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
-  }
-}
-
-void LCD( void *pvParameters) //LCD.
-{
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(180);
-  xLastWakeTime = xTaskGetTickCount();
-  while (1) {
-    lcd.clear();
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
-    // set the cursor to column 0, row 1
-    // (note: line 1 is the second row, since counting begins with 0):
-
-    // Second row
-    lcd.setCursor(0, 0);
-    lcd.print("R");
-    lcd.setCursor(1, 0);
-    lcd.print(servoRAngle);
-
-    lcd.setCursor(0, 1);
-    lcd.print("L");
-    lcd.setCursor(1, 1);
-    lcd.print(servoLAngle);
-
-    lcd.setCursor(6, 0);
-    lcd.print("Belt");
-    lcd.setCursor(7, 1);
-    lcd.print(beltDisplay);
-
-
-    lcd.setCursor(12, 1);
-    lcd.print(rain);
-
-    int value = analogRead(sensor_water);
-    lcd.setCursor(12, 0);
-    lcd.print("F");
-    lcd.setCursor(13, 0);
-    int fuelLevel = value / 45;
-    lcd.print(fuelLevel);
-
-    //lcd.setCursor(14, 1);
-    //lcd.print(millis() / 1000);
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
-  }
-
-}
-
-void RainSensor(void *pvParameters) {
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(240);
-  xLastWakeTime = xTaskGetTickCount();
-  while (1) {
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
-    int sensorValue = analogRead(rainPin);
-    ////Serial.print(sensorValue);
-    if (sensorValue < thresholdValue) {
-      //Serial.println(" - It's wet");
-      rain = "wet";
-
-    }
-    else {
-      ////Serial.println(" - It's dry");
-      rain = "dry";
-    }
-
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
-  }
-}
-
-void RFID(void *pvParameters) {
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(300);
-  xLastWakeTime = xTaskGetTickCount();
-  byte lock = LOW;     // car is locked
-  while (1) {
-    xSemaphoreTake(sem_engineOut, portMAX_DELAY);
-    digitalWrite(ledLock, lock);
-    //Serial.print(lock);
-    if (mfrc522.PICC_IsNewCardPresent()) {
-      unsigned long uid = getID();
-      if (uid == 21043 ) {  //4294934562
-        //Serial.print("Card detected, UID: ");
-        //Serial.println(uid);
-        lock = !lock;
-        if (lock == HIGH) {
-          xSemaphoreGive(sem_rf);
-          //   delay(10);
-        }
-        else {
-          xSemaphoreTake(sem_rf, portMAX_DELAY);
-        }
+      if (valx < 341) {
+        servoRAngle += 2; //right
       }
+      else if (valx > 682) {
+        servoRAngle -= 3;
+      }
+      if (valy < 341) {
+        servoLAngle += 3;
+      }
+      else if (valy > 682) {
+        servoLAngle -= 3;
+      }
+      if (servoRAngle < 0) {
+        servoRAngle = 0;
+      }
+      if (servoRAngle > 90) {
+        servoRAngle = 90;
+      }
+      if (servoLAngle < 90) {
+        servoLAngle = 90;
+      }
+      if (servoLAngle > 180) {
+        servoLAngle = 180;
+      }
+      servoRight.write(servoRAngle);
+      servoLeft.write(servoLAngle);
+      delay(15);
+      vTaskDelayUntil(&xLastWakeTime, xDelay);
     }
-    xSemaphoreGive(sem_engineOut);
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
-}
+
+  void LCD( void *pvParameters) //LCD.
+  {
+    TickType_t xLastWakeTime;
+    const TickType_t xDelay = pdMS_TO_TICKS(180);
+    xLastWakeTime = xTaskGetTickCount();
+    while (1) {
+      lcd.clear();
+      xSemaphoreTake(sem_engine, portMAX_DELAY);
+      xSemaphoreGive(sem_engine);
+      // set the cursor to column 0, row 1
+      // (note: line 1 is the second row, since counting begins with 0):
+
+      // Second row
+      lcd.setCursor(0, 0);
+      lcd.print("R");
+      lcd.setCursor(1, 0);
+      lcd.print(servoRAngle);
+
+      lcd.setCursor(0, 1);
+      lcd.print("L");
+      lcd.setCursor(1, 1);
+      lcd.print(servoLAngle);
+
+      lcd.setCursor(6, 0);
+      lcd.print("Belt");
+      lcd.setCursor(7, 1);
+      lcd.print(beltDisplay);
 
 
-void Ultrasonic(void *pvParameters) {
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(50);
-  xLastWakeTime = xTaskGetTickCount();
-  while (1) {
-    xSemaphoreTake(sem_engine, portMAX_DELAY);
-    xSemaphoreGive(sem_engine);
-    Serial.println("dasdas");
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2);
-    // Sets the trigPin on HIGH state for 10 micro seconds
-    digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(trigPin, LOW);
-    // Reads the echoPin, returns the sound wave travel time in microseconds
-    duration = pulseIn(echoPin, HIGH);
-    // Calculating the distance
-    distance = duration * 0.034 / 2;
-    // Prints the distance on the //Serial Monitor
-    if (distance <= 10) {
-      analogWrite(enA, 0);
-      analogWrite(enB, 0);
+      lcd.setCursor(12, 1);
+      lcd.print(rain);
 
-      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-      digitalWrite(ultraBuzzer, HIGH);
-      xSemaphoreGive(sem_buzzer);
+      int value = analogRead(sensor_water);
+      lcd.setCursor(12, 0);
+      lcd.print("F");
+      lcd.setCursor(13, 0);
+      int fuelLevel = value / 45;
+      lcd.print(fuelLevel);
 
-      Serial.print("Distance: ");
-      Serial.println(distance);
+      //lcd.setCursor(14, 1);
+      //lcd.print(millis() / 1000);
+      vTaskDelayUntil(&xLastWakeTime, xDelay);
     }
-    else {
-      //      int pwmOutput = 255;
-      //      analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
-      //      int pwmout2 = 255;
-      //      analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
 
-      xSemaphoreTake(sem_buzzer, portMAX_DELAY);
-      digitalWrite(ultraBuzzer, LOW);
-      xSemaphoreGive(sem_buzzer);
-    }
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
-}
 
-void Engine (void *pvParameters) // buzz when belt.
-{
-  TickType_t xLastWakeTime;
-  const TickType_t xDelay = pdMS_TO_TICKS(100);
-  xLastWakeTime = xTaskGetTickCount();
-  int engineStart = 0;
-  int lastButtonEngineState = 0;
-  int count = 0;
-  while (1) {
-    xSemaphoreTake(sem_rf, portMAX_DELAY);
-    buttonEngineState = digitalRead(buttonEngine);
-    if (buttonEngineState != lastButtonEngineState) {
-      if (buttonEngineState == HIGH) {
-        count++;
-        if (count > 1) {
-          engineStart = !engineStart;
-          if (engineStart) {
-            xSemaphoreTake(sem_engineOut, portMAX_DELAY);
-            xSemaphoreGive(sem_engine);
-            digitalWrite(ledEngine, engineStart);
+  void RainSensor(void *pvParameters) {
+    TickType_t xLastWakeTime;
+    const TickType_t xDelay = pdMS_TO_TICKS(240);
+    xLastWakeTime = xTaskGetTickCount();
+    while (1) {
+      xSemaphoreTake(sem_engine, portMAX_DELAY);
+      xSemaphoreGive(sem_engine);
+      int sensorValue = analogRead(rainPin);
+      ////Serial.print(sensorValue);
+      if (sensorValue < thresholdValue) {
+        //Serial.println(" - It's wet");
+        rain = "wet";
+
+      }
+      else {
+        ////Serial.println(" - It's dry");
+        rain = "dry";
+      }
+
+      vTaskDelayUntil(&xLastWakeTime, xDelay);
+    }
+  }
+
+  void RFID(void *pvParameters) {
+    TickType_t xLastWakeTime;
+    const TickType_t xDelay = pdMS_TO_TICKS(300);
+    xLastWakeTime = xTaskGetTickCount();
+    byte lock = LOW;     // car is locked
+    while (1) {
+      xSemaphoreTake(sem_engineOut, portMAX_DELAY);
+      digitalWrite(ledLock, lock);
+      //Serial.print(lock);
+      if (mfrc522.PICC_IsNewCardPresent()) {
+        unsigned long uid = getID();
+        if (uid == 21043 ) {  //4294934562
+          //Serial.print("Card detected, UID: ");
+          //Serial.println(uid);
+          lock = !lock;
+          if (lock == HIGH) {
+            xSemaphoreGive(sem_rf);
+            //   delay(10);
           }
           else {
-            analogWrite(enA, 0);
-            analogWrite(enB, 0);
-            digitalWrite(buzzer, LOW);
-            digitalWrite(ledEngine, engineStart);
-            //digitalWrite(ledPin, LOW);
-            xSemaphoreTake(sem_engine, portMAX_DELAY);
-            xSemaphoreGive(sem_rf);
-            xSemaphoreGive(sem_engineOut);
+            xSemaphoreTake(sem_rf, portMAX_DELAY);
           }
         }
       }
-
-      lastButtonEngineState = buttonEngineState;
-
+      xSemaphoreGive(sem_engineOut);
+      vTaskDelayUntil(&xLastWakeTime, xDelay);
     }
-    xSemaphoreGive(sem_rf);
-    if (engineStart) {
-      int pwmOutput = 255;
-      analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin5
-      int pwmout2 = 255;
-      analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
-    }
-    else {
-      analogWrite(enA, 0);
-      analogWrite(enB, 0);
-    }
-    vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
-}
 
 
-void loop() {
+  void Ultrasonic(void *pvParameters) {
+    TickType_t xLastWakeTime;
+    const TickType_t xDelay = pdMS_TO_TICKS(50);
+    xLastWakeTime = xTaskGetTickCount();
+    while (1) {
+      xSemaphoreTake(sem_engine, portMAX_DELAY);
+      xSemaphoreGive(sem_engine);
+     // Serial.println("dasdas");
+      digitalWrite(trigPin, LOW);
+      delayMicroseconds(2);
+      // Sets the trigPin on HIGH state for 10 micro seconds
+      digitalWrite(trigPin, HIGH);
+      delayMicroseconds(10);
+      digitalWrite(trigPin, LOW);
+      // Reads the echoPin, returns the sound wave travel time in microseconds
+      duration = pulseIn(echoPin, HIGH);
+      // Calculating the distance
+      distance = duration * 0.034 / 2;
+      // Prints the distance on the //Serial Monitor
+      if (distance <= 10) {
+        analogWrite(enA, 0);
+        analogWrite(enB, 0);
 
-}
-/*----------------------------------- LCD Info---------------------------------------*/
-/*
-    The circuit:
-   LCD RS pin to digital pin 12
-   LCD Enable pin to digital pin 11
-   LCD D4 pin to digital pin 5
-   LCD D5 pin to digital pin 4
-   LCD D6 pin to digital pin 3
-   LCD D7 pin to digital pin 2
-   LCD R/W pin to ground
-   LCD VSS pin to ground
-   LCD VCC pin to 5V
-   10K resistor:
-   ends to +5V and ground
-   wiper to LCD VO pin (pin 3)
+        xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+        digitalWrite(ultraBuzzer, HIGH);
+        xSemaphoreGive(sem_buzzer);
+
+        Serial.print("Distance: ");
+       Serial.println(distance);
+      }
+      else {
+        //      int pwmOutput = 255;
+        //      analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin
+        //      int pwmout2 = 255;
+        //      analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
+
+        xSemaphoreTake(sem_buzzer, portMAX_DELAY);
+        digitalWrite(ultraBuzzer, LOW);
+        xSemaphoreGive(sem_buzzer);
+      }
+      vTaskDelayUntil(&xLastWakeTime, xDelay);
+    }
+  }
+
+  void Engine (void *pvParameters) // buzz when belt.
+  {
+    TickType_t xLastWakeTime;
+    const TickType_t xDelay = pdMS_TO_TICKS(100);
+    xLastWakeTime = xTaskGetTickCount();
+    int engineStart = 0;
+    int lastButtonEngineState = 0;
+    int count = 0;
+    while (1) {
+      xSemaphoreTake(sem_rf, portMAX_DELAY);
+      buttonEngineState = digitalRead(buttonEngine);
+      if (buttonEngineState != lastButtonEngineState) {
+        if (buttonEngineState == HIGH) {
+          count++;
+          if (count > 1) {
+            engineStart = !engineStart;
+            if (engineStart) {
+              xSemaphoreTake(sem_engineOut, portMAX_DELAY);
+              xSemaphoreGive(sem_engine);
+              digitalWrite(ledEngine, engineStart);
+            }
+            else {
+              analogWrite(enA, 0);
+              analogWrite(enB, 0);
+              digitalWrite(buzzer, LOW);
+              digitalWrite(ledEngine, engineStart);
+              //digitalWrite(ledPin, LOW);
+              xSemaphoreTake(sem_engine, portMAX_DELAY);
+              xSemaphoreGive(sem_rf);
+              xSemaphoreGive(sem_engineOut);
+            }
+          }
+        }
+
+        lastButtonEngineState = buttonEngineState;
+
+      }
+      xSemaphoreGive(sem_rf);
+      if (engineStart) {
+        int pwmOutput = 255;
+        analogWrite(enA, pwmOutput); // Send PWM signal to L298N Enable pin5
+        int pwmout2 = 255;
+        analogWrite(enB, pwmout2); // Send PWM signal to L298N Enable pin
+      }
+      else {
+        analogWrite(enA, 0);
+        analogWrite(enB, 0);
+      }
+      vTaskDelayUntil(&xLastWakeTime, xDelay);
+    }
+  }
+
+
+  void loop() {
+
+  }
+  /*----------------------------------- LCD Info---------------------------------------*/
+  /*
+      The circuit:
+     LCD RS pin to digital pin 12
+     LCD Enable pin to digital pin 11
+     LCD D4 pin to digital pin 5
+     LCD D5 pin to digital pin 4
+     LCD D6 pin to digital pin 3
+     LCD D7 pin to digital pin 2
+     LCD R/W pin to ground
+     LCD VSS pin to ground
+     LCD VCC pin to 5V
+     10K resistor:
+     ends to +5V and ground
+     wiper to LCD VO pin (pin 3)
 
 
 
 
-*/
+  */
