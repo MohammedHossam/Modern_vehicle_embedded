@@ -211,25 +211,22 @@ void handler_belt(void *pvParameters)
         //  xSemaphoreTake(sem_buzzer, portMAX_DELAY);
         //digitalWrite(buzzer, ledLight);
 
+      }
+    }
     if (ledLight == HIGH) {
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, HIGH);
       xSemaphoreGive(sem_buzzer);
-      Serial.println("dasdas");
     }
     else {
       xSemaphoreTake(sem_buzzer, portMAX_DELAY);
       digitalWrite(buzzer, LOW);
       xSemaphoreGive(sem_buzzer);
     }
-      }
-    }
-    delay(50);
     lastButtonState = buttonState;
     vTaskDelayUntil(&xLastWakeTime, xDelay);
   }
-}
-//
+}//
 void Buzzer (void *pvParameters) // buzz when belt.
 {
   TickType_t xLastWakeTime;
